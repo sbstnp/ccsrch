@@ -59,6 +59,7 @@ int    filename_pan_count=0;
 int    file_hit_count=0;
 int    limit_file_results=0;
 char   *exclude_extensions;
+char   *exclude_locations;
 int    newstatus = 0;
 int    status_lastupdate = 0;
 int    status_msglength = 0;
@@ -601,7 +602,8 @@ int proc_dir_list(char *instr)
     if ((fstat.st_mode & S_IFMT) == S_IFDIR)
     {
       strncat(curr_path, "/", MAXPATH);
-      proc_dir_list(curr_path);
+      if(!is_dir_excluded(curr_path))
+        proc_dir_list(curr_path);
     }
     else if ((fstat.st_size > 0) && ((fstat.st_mode & S_IFMT) == S_IFREG))
     {
@@ -797,6 +799,7 @@ void usage(char *progname)
   printf("    -s\t\t   Show live status information (only when using -o)\n");
   printf("    -l N\t   Limits the number of results from a single file before going\n\t\t   on to the next file.\n");
   printf("    -n <list>      File extensions to exclude (i.e .dll,.exe)\n");
+  printf("    -x <list>      Directories to exclude (i.e. /tmp,/etc)\n");
   printf("    -m\t\t   Mask the PAN number.\n");
   printf("    -h\t\t   Usage information\n\n");
   printf("See https://github.com/adamcaudill/ccsrch for more information.\n\n");
@@ -866,6 +869,44 @@ int is_allowed_file_type (char *name)
 	return (ret);
 }
 
+int is_dir_excluded (char *name)
+{
+  char delim[] = ",";
+  char *exclude = NULL;
+  char *result = NULL;
+  char *scan_string = NULL;
+  char *dir_name = NULL;
+  int ret = 0;
+
+  if (exclude_locations != NULL)
+  {
+    exclude = malloc(sizeof(char) * strlen(exclude_locations) + 1);
+    strcpy(exclude, exclude_locations);
+
+    dir_name = stolower(name);
+    result = strtok(exclude, delim);
+    while(result != NULL)
+    {
+      scan_string = malloc(sizeof(char) * strlen(result) + 1);
+      strcpy(scan_string, result);
+      strncat(scan_string, "/", MAXPATH);
+
+      if(strcmp(scan_string, dir_name) == 0)
+      {
+        ret = 1;
+        free(scan_string);
+        break;
+      }
+      else
+        result = strtok(NULL, delim);
+      free(scan_string);
+    }
+    free(exclude);
+  }
+
+  return(ret);
+}
+
 char *get_filename_ext(char *filename)
 {
 	char *slash = strrchr(filename, '/');
@@ -933,7 +974,7 @@ int main(int argc, char *argv[])
   if (argc < 2)
     usage(argv[0]);
 
-  while ((c = getopt(argc, argv,"befjt:To:cml:n:s")) != -1)
+  while ((c = getopt(argc, argv,"befjt:To:cml:x:n:s")) != -1)
   {
     switch (c)
     {
@@ -983,6 +1024,9 @@ int main(int argc, char *argv[])
     case 'n':
     	exclude_extensions = stolower(optarg);
     	break;
+    case 'x':
+      exclude_locations = stolower(optarg);
+      break;
     case 's':
     	newstatus = 1;
 
